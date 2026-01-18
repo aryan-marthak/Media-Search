@@ -1,0 +1,62 @@
+Collections: ['images_c7e1dc1c-dc3c-420b-9f47-8cd297fd02cb', 'faces_c7e1dc1c-dc3c-420b-9f47-8cd297fd02cb']
+
+Query: train
+  1. Score: -0.0297 - sss.jpg
+  2. Score: -0.0297 - 20240726_151131.jpg
+  3. Score: -0.0301 - 20240203_174153.jpg
+  4. Score: -0.0392 - 20240726_151404.jpg
+  5. Score: -0.0491 - image.jpg
+  6. Score: -0.0514 - IMG-20240212-WA0616.jpg
+  7. Score: -0.0668 - 20240726_155924.jpg
+  8. Score: -0.0668 - IMG-20240212-WA0272.jpg
+  9. Score: -0.0670 - 20240726_193414.jpg
+  10. Score: -0.0736 - 20240203_184135.jpg
+
+Query: people
+  1. Score: 0.0097 - sss.jpg
+  2. Score: 0.0097 - 20240726_151131.jpg
+  3. Score: 0.0026 - 20240726_151404.jpg
+  4. Score: -0.0064 - 20240203_174153.jpg
+  5. Score: -0.0091 - IMG-20240212-WA0272.jpg
+  6. Score: -0.0160 - image.jpg
+  7. Score: -0.0215 - similar.jpg
+  8. Score: -0.0286 - IMG-20240212-WA0616.jpg
+  9. Score: -0.0314 - sample.jpg
+  10. Score: -0.0325 - 20240726_155924.jpg
+
+Query: sunset
+  1. Score: 0.0275 - 20240726_151131.jpg
+  2. Score: 0.0275 - sss.jpg
+  3. Score: 0.0189 - 20240726_193414.jpg
+  4. Score: 0.0188 - 20240203_174153.jpg
+  5. Score: 0.0169 - IMG-20240212-WA0272.jpg
+  6. Score: 0.0161 - 20240726_151404.jpg
+  7. Score: 0.0120 - different.jpg
+  8. Score: 0.0114 - image.jpg
+  9. Score: 0.0110 - IMG-20240212-WA0616.jpg
+  10. Score: 0.0053 - 20240726_163140.jpg
+
+Query: car
+  1. Score: -0.0353 - 20240726_151131.jpg
+  2. Score: -0.0353 - sss.jpg
+  3. Score: -0.0427 - 20240203_174153.jpg
+  4. Score: -0.0475 - 20240726_151404.jpg
+  5. Score: -0.0664 - image.jpg
+  6. Score: -0.0780 - 20240726_193414.jpg
+  7. Score: -0.0825 - 20240726_161550.jpg
+  8. Score: -0.0826 - 20240203_181132.jpg
+  9. Score: -0.0827 - 20240726_155924.jpg
+  10. Score: -0.0829 - IMG-20240212-WA0616.jpg
+
+Query: mountain
+  1. Score: 0.0094 - sss.jpg
+  2. Score: 0.0094 - 20240726_151131.jpg
+  3. Score: -0.0049 - 20240726_151404.jpg
+  4. Score: -0.0121 - image.jpg
+  5. Score: -0.0142 - 20240203_174153.jpg
+  6. Score: -0.0170 - 20240726_161550.jpg
+  7. Score: -0.0183 - 20240726_155924.jpg
+  8. Score: -0.0243 - 20240727_152106.jpg
+  9. Score: -0.0262 - sample.jpg
+  10. Score: -0.0267 - 20240726_193414.jpg
+
