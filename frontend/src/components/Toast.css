@@ -1,0 +1,138 @@
+/* Retro Terminal Toast */
+.toast {
+  position: fixed;
+  bottom: var(--spacing-md);
+  right: var(--spacing-md);
+  min-width: 300px;
+  max-width: 400px;
+  padding: var(--spacing-md);
+  background: var(--cream);
+  border: var(--border-thick) solid var(--retro-teal);
+  border-radius: var(--border-radius);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  z-index: 1000;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.toast-success {
+  border-color: var(--retro-teal);
+}
+
+.toast-success .toast-icon {
+  color: var(--retro-teal);
+}
+
+.toast-info {
+  border-color: var(--mustard-gold);
+}
+
+.toast-info .toast-icon {
+  color: var(--mustard-gold);
+}
+
+.toast-loading {
+  border-color: var(--glowing-cyan);
+  animation: slideIn 0.3s ease-out, pulse-glow 2s ease-in-out infinite;
+}
+
+.toast-loading .toast-icon {
+  color: var(--glowing-cyan);
+}
+
+.toast-error {
+  border-color: var(--burnt-orange);
+}
+
+.toast-error .toast-icon {
+  color: var(--burnt-orange);
+}
+
+.toast-content {
+  flex: 1;
+}
+
+.toast-content p {
+  margin: 0;
+  color: var(--dark-brown);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: var(--border-thin) solid var(--retro-teal);
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--dark-brown);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.toast-close:hover {
+  background: var(--burnt-orange);
+  border-color: var(--burnt-orange);
+  color: var(--cream);
+}
+
+.toast-close svg {
+  width: 14px;
+  height: 14px;
+}
+
+.spinner-small {
+  width: 20px;
+  height: 20px;
+  border: var(--border-thin) solid var(--darker-cream);
+  border-top-color: var(--glowing-cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .toast {
+    bottom: var(--spacing-sm);
+    right: var(--spacing-sm);
+    left: var(--spacing-sm);
+    min-width: auto;
+  }
+}

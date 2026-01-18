@@ -1,0 +1,139 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Pixel Snap Color Palette - Nintendo-Tech Retro */
+  --cream: #F2F0E6;
+  --burnt-orange: #C15B39;
+  --mustard-gold: #D9A64A;
+  --retro-teal: #429EA6;
+  --glowing-cyan: #5FFFFF;
+  --dark-brown: #7A3E1E;
+  --darker-cream: #E8E6DC;
+  
+  /* Derived Colors */
+  --orange-transparent: rgba(193, 91, 57, 0.3);
+  --cyan-glow: rgba(95, 255, 255, 0.3);
+  --cyan-glow-bright: rgba(95, 255, 255, 0.6);
+  
+  /* Border System */
+  --border-thick: 4px;
+  --border-thin: 2px;
+  --border-radius: 2px;
+  
+  /* Spacing (8px grid) */
+  --spacing-unit: 8px;
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-md: 24px;
+  --spacing-lg: 48px;
+  
+  /* Typography */
+  --font-display: 'Press Start 2P', monospace;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  
+  /* Effects */
+  --shadow-glow-cyan: 0 0 20px var(--cyan-glow);
+  --shadow-glow-cyan-bright: 0 0 30px var(--cyan-glow-bright);
+  --shadow-pixel: 3px 3px 0 var(--dark-brown);
+}
+
+body {
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--cream);
+  color: var(--dark-brown);
+  line-height: 1.6;
+}
+
+code {
+  font-family: var(--font-mono);
+}
+
+/* Utility Classes */
+.pixel-text {
+  font-family: var(--font-display);
+  text-shadow: var(--shadow-pixel);
+  text-transform: uppercase;
+}
+
+.mono-text {
+  font-family: var(--font-mono);
+}
+
+.uppercase {
+  text-transform: uppercase;
+}
+
+/* Scanline Effect */
+.scanlines {
+  position: relative;
+}
+
+.scanlines::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15) 0px,
+    rgba(0, 0, 0, 0.15) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  pointer-events: none;
+  transition: opacity 0.3s ease-out;
+}
+
+.scanlines:hover::after {
+  opacity: 0;
+}
+
+/* Glow Effects */
+.glow-cyan {
+  box-shadow: var(--shadow-glow-cyan);
+  transition: box-shadow 0.3s ease-out;
+}
+
+.glow-cyan:hover {
+  box-shadow: var(--shadow-glow-cyan-bright);
+}
+
+/* Animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px var(--cyan-glow);
+  }
+  50% {
+    box-shadow: 0 0 30px var(--cyan-glow-bright);
+  }
+}
+
+@keyframes blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+/* Disable animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

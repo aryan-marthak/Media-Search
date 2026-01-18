@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Node
+node_modules/
+dist/
+.cache/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Storage
+storage/images/*
+!storage/images/.gitkeep
+
+# Database
+*.db
+*.sqlite
+
+# Model cache
+.cache/
+huggingface/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
