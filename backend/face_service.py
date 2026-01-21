@@ -13,6 +13,20 @@ import cv2
 
 import config
 
+# Configure TensorFlow to use GPU
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+import tensorflow as tf
+
+# Enable GPU memory growth to avoid OOM errors
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print(f">> TensorFlow GPU enabled: {len(gpus)} GPU(s) available")
+    except RuntimeError as e:
+        print(f">> TensorFlow GPU configuration error: {e}")
+
 
 class FaceService:
     """Service for face detection and embedding extraction using DeepFace."""
