@@ -15,8 +15,8 @@ class ClusteringService:
     
     def __init__(self):
         """Initialize clustering service."""
-        self.eps = 0.35  # Distance threshold (balanced for good matching)
-        self.min_samples = 2  # Minimum faces to form a cluster
+        self.eps = 0.40  # Distance threshold (more lenient to include more faces)
+        self.min_samples = 1  # Allow single-face clusters
         print(f">> Clustering Service initialized (eps={self.eps}, min_samples={self.min_samples})")
     
     def cluster_faces(self) -> Dict[str, int]:
