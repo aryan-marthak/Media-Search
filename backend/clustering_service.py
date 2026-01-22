@@ -1,5 +1,5 @@
 """
-Face clustering service using DBSCAN algorithm.
+Face clustering service using HDBSCAN algorithm.
 """
 import numpy as np
 from sklearn.cluster import DBSCAN
@@ -15,8 +15,8 @@ class ClusteringService:
     
     def __init__(self):
         """Initialize clustering service."""
-        self.eps = 0.40  # Distance threshold (more lenient to include more faces)
-        self.min_samples = 1  # Allow single-face clusters
+        self.eps = 0.42  # Distance threshold (more lenient - merges same person with variations)
+        self.min_samples = 1  # Allow single-face clusters (user will manually group)
         print(f">> Clustering Service initialized (eps={self.eps}, min_samples={self.min_samples})")
     
     def cluster_faces(self) -> Dict[str, int]:
@@ -59,7 +59,6 @@ class ClusteringService:
         print(f">> Clustering {len(face_ids)} faces...")
         
         # Compute cosine distance matrix
-        # DBSCAN uses distance, so we convert similarity to distance
         similarity_matrix = cosine_similarity(embeddings)
         
         # Clip similarity to [-1, 1] to avoid floating point errors
@@ -97,19 +96,21 @@ class ClusteringService:
             # Create new cluster
             cluster_id = str(uuid.uuid4())
             
-            # Find representative face (most central)
-            centroid = np.mean(cluster_embeddings, axis=0)
-            distances_to_centroid = np.linalg.norm(cluster_embeddings - centroid, axis=1)
-            representative_idx = np.argmin(distances_to_centroid)
+            # Compute representative embedding (mean of all faces)
+            representative_embedding = np.mean(cluster_embeddings, axis=0)
+            
+            # Find face closest to representative embedding
+            similarities = cosine_similarity([representative_embedding], cluster_embeddings)[0]
+            representative_idx = np.argmax(similarities)
             representative_face_id = cluster_face_ids[representative_idx]
             
             # Insert cluster
             cursor.execute("""
-                INSERT INTO face_clusters (id, representative_face_id, face_count)
-                VALUES (%s, %s, %s)
-            """, (cluster_id, representative_face_id, len(cluster_face_ids)))
+                INSERT INTO face_clusters (id, name, representative_face_id, face_count)
+                VALUES (%s, %s, %s, %s)
+            """, (cluster_id, f"Person {clusters_created + 1}", representative_face_id, len(cluster_face_ids)))
             
-            # Assign cluster_id to all faces in cluster
+            # Update faces with cluster_id
             for face_id in cluster_face_ids:
                 cursor.execute("""
                     UPDATE faces 
@@ -125,37 +126,66 @@ class ClusteringService:
         conn.close()
         
         stats = {
-            'total_faces': int(len(face_ids)),
-            'clustered': int(clustered_count),
-            'clusters_created': int(clusters_created),
-            'outliers': int(outlier_count)
+            'total_faces': len(face_ids),
+            'clustered': clustered_count,
+            'clusters_created': clusters_created,
+            'outliers': outlier_count
         }
         
         print(f">> Clustering complete: {clusters_created} clusters, {clustered_count} faces clustered, {outlier_count} outliers")
         return stats
     
-    def recluster_all(self) -> Dict[str, int]:
+    def merge_clusters(self, cluster_ids: List[str], new_name: str) -> Dict[str, any]:
         """
-        Re-cluster all faces (reset and cluster from scratch).
+        Merge multiple clusters into one.
         
+        Args:
+            cluster_ids: List of cluster IDs to merge
+            new_name: Name for the merged cluster
+            
         Returns:
-            Clustering statistics
+            Dictionary with merge statistics
         """
+        if len(cluster_ids) < 2:
+            raise ValueError("Need at least 2 clusters to merge")
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Reset all cluster assignments
-        cursor.execute("UPDATE faces SET cluster_id = NULL")
+        # Keep first cluster, merge others into it
+        primary_cluster_id = cluster_ids[0]
+        secondary_cluster_ids = cluster_ids[1:]
         
-        # Delete all clusters
-        cursor.execute("DELETE FROM face_clusters")
+        # Update all faces from secondary clusters to primary cluster
+        for cluster_id in secondary_cluster_ids:
+            cursor.execute("""
+                UPDATE faces 
+                SET cluster_id = %s 
+                WHERE cluster_id = %s
+            """, (primary_cluster_id, cluster_id))
+        
+        # Delete secondary clusters
+        cursor.execute("""
+            DELETE FROM face_clusters 
+            WHERE id = ANY(%s)
+        """, (secondary_cluster_ids,))
+        
+        # Update primary cluster name and face count
+        cursor.execute("""
+            UPDATE face_clusters 
+            SET name = %s,
+                face_count = (SELECT COUNT(*) FROM faces WHERE cluster_id = %s)
+            WHERE id = %s
+        """, (new_name, primary_cluster_id, primary_cluster_id))
         
         conn.commit()
         cursor.close()
         conn.close()
         
-        # Run clustering
-        return self.cluster_faces()
+        return {
+            'merged_cluster_id': primary_cluster_id,
+            'clusters_merged': len(secondary_cluster_ids) + 1
+        }
 
 
 # Singleton instance

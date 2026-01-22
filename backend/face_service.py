@@ -1,11 +1,10 @@
 """
-Face detection and recognition service using DeepFace.
+Face detection and recognition service using DeepFace with ArcFace.
 """
 import os
-import uuid
 import time
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import List, Dict
 import numpy as np
 from PIL import Image
 from deepface import DeepFace
@@ -13,7 +12,7 @@ import cv2
 
 import config
 
-# Configure TensorFlow to use GPU
+# Configure TensorFlow to use GPU if available
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 import tensorflow as tf
 
@@ -29,12 +28,12 @@ if gpus:
 
 
 class FaceService:
-    """Service for face detection and embedding extraction using DeepFace."""
+    """Service for face detection and embedding extraction using ArcFace."""
     
     def __init__(self):
         """Initialize DeepFace with ArcFace model."""
-        self.model_name = "ArcFace"  # Using ArcFace for best accuracy
-        self.detector_backend = "opencv"  # Fast detector (retinaface is too slow)
+        self.model_name = "ArcFace"  # Best accuracy for face clustering
+        self.detector_backend = "retinaface"  # More accurate detector (catches small/side faces)
         self.face_storage = Path(config.STORAGE_DIR) / "faces"
         self.face_storage.mkdir(parents=True, exist_ok=True)
         
@@ -45,14 +44,11 @@ class FaceService:
             # Explicitly build the recognition model
             DeepFace.build_model(self.model_name)
             
-            # Create a realistic test image (not just black) to trigger detector initialization
-            # Create a simple face-like pattern
-            test_img = np.ones((200, 200, 3), dtype=np.uint8) * 128  # Gray background
-            # Add some variation to make it more realistic
+            # Create a test image to trigger detector initialization
+            test_img = np.ones((200, 200, 3), dtype=np.uint8) * 128
             test_img[50:150, 75:125] = 180  # Lighter "face" region
             
             # Run face detection to trigger full initialization
-            # This will initialize the detector even if no face is found
             _ = DeepFace.represent(
                 img_path=test_img,
                 model_name=self.model_name,
@@ -68,7 +64,7 @@ class FaceService:
     
     def detect_and_extract_faces(self, image: Image.Image) -> List[Dict]:
         """
-        Detect faces in image and extract embeddings.
+        Detect faces in image and extract embeddings using ArcFace.
         
         Args:
             image: PIL Image
@@ -116,6 +112,9 @@ class FaceService:
                 # Get embedding (512-dim for ArcFace)
                 embedding = np.array(face_obj["embedding"])
                 
+                # Normalize embedding (L2 normalization)
+                embedding = embedding / np.linalg.norm(embedding)
+                
                 # Get confidence
                 confidence = face_obj.get("confidence", 1.0)
                 
@@ -160,18 +159,14 @@ class FaceService:
         Compute cosine similarity between two face embeddings.
         
         Args:
-            embedding1: First embedding
-            embedding2: Second embedding
+            embedding1: First embedding (normalized)
+            embedding2: Second embedding (normalized)
             
         Returns:
             Similarity score (0-1, higher is more similar)
         """
-        # Normalize embeddings
-        norm1 = embedding1 / np.linalg.norm(embedding1)
-        norm2 = embedding2 / np.linalg.norm(embedding2)
-        
-        # Cosine similarity
-        similarity = np.dot(norm1, norm2)
+        # Cosine similarity (embeddings are already normalized)
+        similarity = np.dot(embedding1, embedding2)
         
         return float(similarity)
 
