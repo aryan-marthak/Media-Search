@@ -137,20 +137,24 @@ def expand_query_multi_word(query: str) -> List[str]:
         List of all expanded terms
     """
     query_lower = query.lower().strip()
-    
+
     # Split into words
     words = query_lower.split()
-    
-    # Expand each word
-    all_expansions = set()
+
+    # Expand each word, preserving order and de-duplicating
+    ordered: List[str] = []
+    seen = set()
+
     for word in words:
-        if word in QUERY_EXPANSIONS_LOWER:
-            all_expansions.update(QUERY_EXPANSIONS_LOWER[word])
-        else:
-            # Keep original word if no expansion found
-            all_expansions.add(word)
-    
-    return list(all_expansions)
+        candidates = QUERY_EXPANSIONS_LOWER.get(word, [word])
+        for term in candidates:
+            term = term.strip().lower()
+            if not term or term in seen:
+                continue
+            seen.add(term)
+            ordered.append(term)
+
+    return ordered
 
 
 def get_primary_term(query: str) -> str:

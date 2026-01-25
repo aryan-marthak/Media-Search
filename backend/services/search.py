@@ -23,31 +23,55 @@ async def normal_search(
     This is the default search mode optimized for speed and good recall.
     Automatically searches for query variations to improve hit rate.
     """
-    # Step 1: Expand query to semantic variants
+    # Step 1: Build ordered term list (exact query first)
+    normalized_query = query.strip().lower()
     expanded_terms = expand_query_multi_word(query)
-    
-    # Step 2: Search with each expanded term and aggregate results
-    all_results = {}  # Using dict to deduplicate by ID
-    
-    for term in expanded_terms[:10]:  # Limit expansions to avoid slowdown
+    ordered_terms = [normalized_query] + [t for t in expanded_terms if t != normalized_query]
+
+    # Step 2: Search with each term and aggregate results
+    # We keep the best *direct* match and best *expanded* match separately,
+    # then prefer direct intent unless the expanded hit is much better.
+    direct_best: Dict[Any, Dict[str, Any]] = {}
+    expanded_best: Dict[Any, Dict[str, Any]] = {}
+
+    max_terms = 6 if len(normalized_query.split()) <= 2 else 10
+    max_terms = min(max_terms, len(ordered_terms))
+
+    # Penalty to prevent synonyms overwhelming the exact query intent
+    expansion_penalty = 0.85
+
+    for term in ordered_terms[:max_terms]:
         term_embedding = encode_text(term)
         results = await search_images(user_id, term_embedding, min(top_k, 10))
-        
+
         for r in results:
             image_id = r["id"]
-            
-            # Calibrate score
-            calibrated_score = calibrate_siglip_score(r["score"])
-            
-            # Keep highest score for this image across all expansions
-            if image_id not in all_results or calibrated_score > all_results[image_id]["score"]:
-                all_results[image_id] = {
-                    "id": image_id,
-                    "metadata": r["metadata"],
-                    "score": calibrated_score,
-                    "raw_score": r["score"],
-                    "matched_term": term
-                }
+
+            raw_score = r["score"]
+            calibrated_score = calibrate_siglip_score(raw_score)
+
+            record = {
+                "id": image_id,
+                "metadata": r["metadata"],
+                "score": calibrated_score,
+                "raw_score": raw_score,
+                "matched_term": term,
+            }
+
+            if term == normalized_query:
+                prev = direct_best.get(image_id)
+                if prev is None or record["score"] > prev["score"]:
+                    direct_best[image_id] = record
+            else:
+                # Apply a small penalty so exact query stays on top when close
+                record["score"] = record["score"] * expansion_penalty
+                prev = expanded_best.get(image_id)
+                if prev is None or record["score"] > prev["score"]:
+                    expanded_best[image_id] = record
+
+    # Merge, preferring direct results when present
+    all_results: Dict[Any, Dict[str, Any]] = dict(expanded_best)
+    all_results.update(direct_best)
     
     if not all_results:
         return []
