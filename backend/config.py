@@ -42,7 +42,8 @@ DEVICE = os.getenv("DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
 
 # Search Configuration
 TOP_K = 20  # Number of results to return
-SCORE_THRESHOLD = 0.20  # Minimum similarity score
+SCORE_THRESHOLD = 0.20  # Minimum similarity score for normal search
+DEEP_SEARCH_THRESHOLD = 0.35  # Higher threshold for Deep Search (text-to-text matching)
 ENABLE_LOCAL_RERANKING = True  # Enable local crop re-ranking
 ENABLE_ZERO_SHOT_FILTER = False  # Disable zero-shot filtering (too aggressive)
 ZERO_SHOT_THRESHOLD = 0.55  # Confidence threshold for zero-shot
@@ -54,6 +55,11 @@ NUM_CROPS = 5  # Number of crops per image for local scoring
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8000"))
 
-# VLM Configuration
-# Set to "false" for fast uploads, then run /reprocess-vlm later for Deep Search
-ENABLE_VLM = os.getenv("ENABLE_VLM", "false").lower() == "true"
+# VLM Configuration (SmolVLM2-2.2B for Deep Search)
+ENABLE_VLM = os.getenv("ENABLE_VLM", "true").lower() == "true"
+
+# Deep Search Hybrid Configuration
+# Combines BM25 keyword matching with CLIP semantic matching
+BM25_WEIGHT = 0.7  # Weight for keyword matching (precision)
+CLIP_WEIGHT = 0.3  # Weight for semantic matching (recall)
+MIN_BM25_SCORE = 0.15  # Minimum normalized BM25 score to filter weak matches

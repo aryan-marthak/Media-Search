@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import './Search.css';
+import './SearchModal.css';
 
 function Search() {
     const [searchMode, setSearchMode] = useState('normal');
@@ -11,6 +12,9 @@ function Search() {
     const [didYouMean, setDidYouMean] = useState(null);
     const [suggestions, setSuggestions] = useState([]);
     const [hasSearched, setHasSearched] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [imageDetails, setImageDetails] = useState(null);
+    const [modalLoading, setModalLoading] = useState(false);
 
     const handleSearch = async (e, overrideQuery = null) => {
         e?.preventDefault();
@@ -90,6 +94,26 @@ function Search() {
         setCorrectedQuery(null);
         setDidYouMean(null);
         setSuggestions([]);
+    };
+
+    const handleImageClick = async (imageId) => {
+        setSelectedImage(imageId);
+        setModalLoading(true);
+
+        try {
+            const response = await axios.get(`http://localhost:8000/image-details/${imageId}`);
+            setImageDetails(response.data);
+        } catch (error) {
+            console.error('Failed to load image details:', error);
+            setImageDetails(null);
+        } finally {
+            setModalLoading(false);
+        }
+    };
+
+    const closeModal = () => {
+        setSelectedImage(null);
+        setImageDetails(null);
     };
 
     return (
@@ -188,7 +212,12 @@ function Search() {
                             </div>
                             <div className="results-grid">
                                 {results.map((result) => (
-                                    <div key={result.image_id} className="result-card">
+                                    <div
+                                        key={result.image_id}
+                                        className="result-card"
+                                        onClick={() => handleImageClick(result.image_id)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
                                         <img
                                             src={`http://localhost:8000${result.image_url}`}
                                             alt="Search result"
@@ -229,6 +258,42 @@ function Search() {
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Image Details Modal */}
+            {selectedImage && (
+                <div className="modal-overlay" onClick={closeModal}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <button className="modal-close" onClick={closeModal}>×</button>
+
+                        {modalLoading ? (
+                            <div className="modal-loading">Loading...</div>
+                        ) : imageDetails ? (
+                            <>
+                                <img
+                                    src={`http://localhost:8000${imageDetails.image_url}`}
+                                    alt="Full size"
+                                    className="modal-image"
+                                />
+
+                                {imageDetails.vlm_description && (
+                                    <div className="vlm-description">
+                                        <h3>🔍 Deep Search Description</h3>
+                                        <p>{imageDetails.vlm_description}</p>
+                                    </div>
+                                )}
+
+                                {!imageDetails.vlm_processed && (
+                                    <div className="no-vlm-warning">
+                                        ⚠️ This image doesn't have a VLM description yet.
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="modal-error">Failed to load image details</div>
+                        )}
+                    </div>
+                </div>
             )}
         </div>
     );
