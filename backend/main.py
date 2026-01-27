@@ -585,16 +585,20 @@ async def search_images(request: SearchRequest):
 @app.post("/deep-search", response_model=SearchResponse)
 async def deep_search_images(request: SearchRequest):
     """
-    Deep Search using VLM descriptions for detailed, contextual queries.
+    Hybrid Deep Search using BM25 keyword matching + CLIP semantic matching.
     
     Strategy:
     1. Retrieve all VLM descriptions from database
-    2. Encode query and descriptions as text embeddings
-    3. Compute cosine similarity
-    4. Return top-k matches
+    2. Index descriptions with BM25 for keyword matching
+    3. Compute BM25 scores (keyword precision)
+    4. Compute CLIP scores (semantic understanding)
+    5. Combine scores: 70% BM25 + 30% CLIP
+    6. Return top-k matches
     """
     try:
         from vlm_service import get_vlm_service
+        from bm25_matcher import get_bm25_matcher
+        
         vlm_service = get_vlm_service()
         
         if not vlm_service.is_available():
@@ -604,9 +608,7 @@ async def deep_search_images(request: SearchRequest):
             )
         
         embedding_service = get_embedding_service()
-        
-        # Encode query as text
-        query_embedding = embedding_service.encode_text(request.query)
+        bm25_matcher = get_bm25_matcher()
         
         # Retrieve all images with VLM descriptions
         conn = get_db_connection()
@@ -628,27 +630,56 @@ async def deep_search_images(request: SearchRequest):
                 total=0
             )
         
-        # Compute similarity scores
+        # Extract descriptions and image IDs
+        descriptions = [row['vlm_description'] for row in rows]
+        image_ids = [row['id'] for row in rows]
+        
+        # Index descriptions with BM25
+        bm25_matcher.index_documents(descriptions)
+        
+        # Encode query for CLIP
+        query_embedding = embedding_service.encode_text(request.query)
+        
+        # Compute hybrid scores
         results_with_scores = []
-        for row in rows:
+        
+        # Get BM25 scores for all documents
+        bm25_results = bm25_matcher.search(request.query, top_k=len(descriptions))
+        bm25_scores_dict = {idx: score for idx, score in bm25_results}
+        
+        # Normalize BM25 scores to 0-1 range
+        max_bm25_score = max(bm25_scores_dict.values()) if bm25_scores_dict else 1.0
+        
+        for i, row in enumerate(rows):
             image_id = row['id']
             description = row['vlm_description']
             
-            # Encode description as text
+            # Get BM25 score (keyword matching)
+            bm25_score = bm25_scores_dict.get(i, 0.0)
+            bm25_normalized = bm25_score / max_bm25_score if max_bm25_score > 0 else 0.0
+            
+            # Filter out weak keyword matches (e.g., single-word match in multi-word query)
+            if bm25_normalized < config.MIN_BM25_SCORE:
+                continue
+            
+            # Get CLIP score (semantic matching)
             desc_embedding = embedding_service.encode_text(description)
+            clip_score = float(np.dot(query_embedding, desc_embedding))
             
-            # Compute cosine similarity
-            similarity = np.dot(query_embedding, desc_embedding)
+            # Hybrid score: 70% BM25 + 30% CLIP
+            hybrid_score = (config.BM25_WEIGHT * bm25_normalized) + (config.CLIP_WEIGHT * clip_score)
             
-            # Filter by threshold
-            if similarity >= config.SCORE_THRESHOLD:
+            # Filter by hybrid threshold
+            if hybrid_score >= config.DEEP_SEARCH_THRESHOLD:
                 results_with_scores.append({
                     'image_id': image_id,
-                    'score': float(similarity),
+                    'score': hybrid_score,
+                    'bm25_score': bm25_normalized,
+                    'clip_score': clip_score,
                     'description': description
                 })
         
-        # Sort by score
+        # Sort by hybrid score
         results_with_scores.sort(key=lambda x: x['score'], reverse=True)
         
         # Take top-k
@@ -938,6 +969,43 @@ async def reprocess_vlm_descriptions():
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Reprocessing failed: {str(e)}")
+
+
+
+@app.get("/image-details/{image_id}")
+async def get_image_details(image_id: str):
+    """
+    Get detailed information about an image, including VLM description.
+    Used for displaying image details in Deep Search modal.
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, file_path, vlm_description, vlm_processed, created_at
+            FROM images
+            WHERE id = %s
+        """, (image_id,))
+        
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Image not found")
+        
+        return {
+            "id": row['id'],
+            "image_url": f"/images/{row['id']}.jpg",
+            "vlm_description": row['vlm_description'],
+            "vlm_processed": row['vlm_processed'],
+            "created_at": row['created_at'].isoformat() if row['created_at'] else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get image details: {str(e)}")
 
 
 if __name__ == "__main__":
