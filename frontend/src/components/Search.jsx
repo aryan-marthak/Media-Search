@@ -278,14 +278,14 @@ function Search() {
 
                                 {imageDetails.vlm_description && (
                                     <div className="vlm-description">
-                                        <h3>🔍 Deep Search Description</h3>
+                                        <h3>Image Description</h3>
                                         <p>{imageDetails.vlm_description}</p>
                                     </div>
                                 )}
 
                                 {!imageDetails.vlm_processed && (
                                     <div className="no-vlm-warning">
-                                        ⚠️ This image doesn't have a VLM description yet.
+                                        ⚠️ This image doesn't have a description yet.
                                     </div>
                                 )}
                             </>
