@@ -62,4 +62,4 @@ ENABLE_VLM = os.getenv("ENABLE_VLM", "true").lower() == "true"
 # Combines BM25 keyword matching with CLIP semantic matching
 BM25_WEIGHT = 0.7  # Weight for keyword matching (precision)
 CLIP_WEIGHT = 0.3  # Weight for semantic matching (recall)
-MIN_BM25_SCORE = 0.15  # Minimum normalized BM25 score to filter weak matches
+MIN_BM25_SCORE = 0.30  # Minimum normalized BM25 score to filter weak matches

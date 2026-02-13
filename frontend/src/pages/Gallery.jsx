@@ -341,6 +341,29 @@ function Gallery() {
                             src={imagesApi.getFullImageUrl(selectedImage.file_path)}
                             alt={selectedImage.original_filename}
                         />
+
+                        {/* Description Box */}
+                        {selectedImage.vlm_description && (
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '80px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                maxWidth: '80%',
+                                width: 'auto',
+                                background: 'rgba(0, 0, 0, 0.75)',
+                                backdropFilter: 'blur(10px)',
+                                color: 'white',
+                                padding: 'var(--spacing-md)',
+                                borderRadius: 'var(--radius-md)',
+                                fontSize: '0.9rem',
+                                lineHeight: '1.5',
+                                textAlign: 'center',
+                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                            }}>
+                                {selectedImage.vlm_description}
+                            </div>
+                        )}
                     </div>
                     <div style={{
                         position: 'absolute',
@@ -350,6 +373,21 @@ function Gallery() {
                         display: 'flex',
                         gap: 'var(--spacing-sm)'
                     }}>
+                        <button
+                            className="btn btn-secondary"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const link = document.createElement('a');
+                                link.href = imagesApi.getFullImageUrl(selectedImage.file_path);
+                                link.download = selectedImage.original_filename;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                            }}
+                        >
+                            <Upload size={16} style={{ transform: 'rotate(180deg)' }} />
+                            Download
+                        </button>
                         <button
                             className="btn btn-secondary"
                             style={{ background: 'rgba(239, 68, 68, 0.2)', borderColor: 'var(--error)', color: 'var(--error)' }}

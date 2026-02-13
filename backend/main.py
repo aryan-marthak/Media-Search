@@ -37,13 +37,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for serving images
-app.mount("/images", StaticFiles(directory=str(config.STORAGE_DIR)), name="images")
+# Custom static files with CORS headers for downloads
+from fastapi.responses import FileResponse
+from starlette.staticfiles import StaticFiles as StarletteStaticFiles
 
-# Mount static files for serving face thumbnails
+class CORSStaticFiles(StarletteStaticFiles):
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        # Add CORS headers to allow fetch from frontend
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        # Force download instead of display when accessed via download parameter
+        if scope.get("query_string"):
+            query = scope["query_string"].decode()
+            if "download=1" in query:
+                import os
+                filename = os.path.basename(path)
+                response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+# Mount static files for serving images with CORS
+app.mount("/images", CORSStaticFiles(directory=str(config.STORAGE_DIR)), name="images")
+
+# Mount static files for serving face thumbnails with CORS
 faces_dir = config.STORAGE_DIR / "faces"
 faces_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/faces", StaticFiles(directory=str(faces_dir)), name="faces")
+app.mount("/faces", CORSStaticFiles(directory=str(faces_dir)), name="faces")
 
 
 @app.on_event("startup")
@@ -233,22 +253,47 @@ async def get_gallery():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        
+        # Get all images with their descriptions
         cursor.execute("""
-            SELECT id, file_path, created_at
+            SELECT id, file_path, vlm_description, created_at
             FROM images 
             ORDER BY created_at DESC
         """)
         rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
         
         images = []
         for row in rows:
+            image_id = row['id']
+            
+            # Get face clusters for this image
+            cursor.execute("""
+                SELECT DISTINCT fc.name, fc.id
+                FROM faces f
+                JOIN face_clusters fc ON f.cluster_id = fc.id
+                WHERE f.image_id = %s
+                ORDER BY fc.name
+            """, (image_id,))
+            
+            face_rows = cursor.fetchall()
+            face_names = []
+            for face_row in face_rows:
+                if face_row['name']:
+                    face_names.append(face_row['name'])
+                else:
+                    # Use cluster ID for unnamed clusters
+                    face_names.append(f"Person {face_row['id'][:8]}")
+            
             images.append(GalleryImage(
                 id=row['id'],
                 url=f"/images/{row['id']}{Path(row['file_path']).suffix}",
-                uploaded_at=row['created_at'].isoformat() if row['created_at'] else None
+                uploaded_at=row['created_at'].isoformat() if row['created_at'] else None,
+                description=row['vlm_description'],
+                faces=face_names
             ))
+        
+        cursor.close()
+        conn.close()
         
         return GalleryResponse(
             total=len(images),

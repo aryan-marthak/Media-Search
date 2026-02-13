@@ -22,6 +22,7 @@ class ImageResponse(BaseModel):
     file_path: str
     thumbnail_path: Optional[str]
     processing_status: str
+    vlm_description: Optional[str] = None
     created_at: datetime
     processed_at: Optional[datetime]
 

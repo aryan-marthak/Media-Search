@@ -39,6 +39,8 @@ class GalleryImage(BaseModel):
     id: str
     url: str
     uploaded_at: Optional[str] = None
+    description: Optional[str] = None
+    faces: Optional[List[str]] = None  # List of face cluster names
 
 
 class GalleryResponse(BaseModel):
