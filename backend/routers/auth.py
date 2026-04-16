@@ -1,26 +1,33 @@
-from typing import Annotated
-from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
+"""
+Auth router — register, login, refresh, and /me endpoints.
+"""
+import uuid
+from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from database import get_db
-from models import User
-from auth import hash_password, verify_password, create_access_token, create_refresh_token, decode_token, get_current_user
+from database import get_db_connection
+from services.auth_service import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    get_current_user,
+)
 
-router = APIRouter()
+router = APIRouter(prefix="/auth")
 
 
-# Request/Response schemas
+# ── Request / Response models ──────────────────────────────────────────────────
+
 class RegisterRequest(BaseModel):
     username: str
-    email: EmailStr
+    email: str
     password: str
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -35,92 +42,108 @@ class RefreshRequest(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: UUID
+    id: str
     username: str
     email: str
 
-    class Config:
-        from_attributes = True
 
+# ── Endpoints ──────────────────────────────────────────────────────────────────
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    """Register a new user."""
-    # Check if email already exists
-    result = await db.execute(select(User).where(User.email == request.email))
-    if result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-    
-    # Check if username already exists
-    result = await db.execute(select(User).where(User.username == request.username))
-    if result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken"
-        )
-    
-    # Create user
-    user = User(
-        username=request.username,
-        email=request.email,
-        hashed_password=hash_password(request.password)
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register(req: RegisterRequest):
+    """Create a new user account."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Check for existing email or username
+    cursor.execute(
+        "SELECT id FROM users WHERE email = %s OR username = %s",
+        (req.email, req.username),
     )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    
-    return user
+    if cursor.fetchone():
+        cursor.close()
+        conn.close()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email or username already registered",
+        )
+
+    user_id = str(uuid.uuid4())
+    password_hash = hash_password(req.password)
+
+    cursor.execute(
+        "INSERT INTO users (id, username, email, password_hash) VALUES (%s, %s, %s, %s)",
+        (user_id, req.username, req.email, password_hash),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return TokenResponse(
+        access_token=create_access_token(user_id),
+        refresh_token=create_refresh_token(user_id),
+    )
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """Login and get JWT tokens."""
-    result = await db.execute(select(User).where(User.email == request.email))
-    user = result.scalar_one_or_none()
-    
-    if not user or not verify_password(request.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
-        )
-    
-    return TokenResponse(
-        access_token=create_access_token(user.id, user.username),
-        refresh_token=create_refresh_token(user.id)
+async def login(req: LoginRequest):
+    """Authenticate and return JWT tokens."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id, password_hash FROM users WHERE email = %s",
+        (req.email,),
     )
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
 
-
-@router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(request: RefreshRequest, db: AsyncSession = Depends(get_db)):
-    """Refresh access token using refresh token."""
-    payload = decode_token(request.refresh_token)
-    
-    if payload is None or payload.get("type") != "refresh":
+    if not row or not verify_password(req.password, row["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token"
+            detail="Incorrect email or password",
         )
-    
-    user_id = payload.get("sub")
-    result = await db.execute(select(User).where(User.id == UUID(user_id)))
-    user = result.scalar_one_or_none()
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
-    
+
     return TokenResponse(
-        access_token=create_access_token(user.id, user.username),
-        refresh_token=create_refresh_token(user.id)
+        access_token=create_access_token(row["id"]),
+        refresh_token=create_refresh_token(row["id"]),
     )
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(current_user: Annotated[User, Depends(get_current_user)]):
-    """Get current user info."""
-    return current_user
+async def get_me(user_id: str = Depends(get_current_user)):
+    """Return the current user's profile."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id, username, email FROM users WHERE id = %s",
+        (user_id,),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    return UserResponse(id=row["id"], username=row["username"], email=row["email"])
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh(req: RefreshRequest):
+    """Exchange a refresh token for a new access + refresh token pair."""
+    payload = decode_token(req.refresh_token)
+
+    if payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    user_id = payload.get("sub")
+    return TokenResponse(
+        access_token=create_access_token(user_id),
+        refresh_token=create_refresh_token(user_id),
+    )

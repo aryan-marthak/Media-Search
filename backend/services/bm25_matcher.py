@@ -2,10 +2,11 @@
 BM25 Text Matching Service for Deep Search.
 Provides keyword-based matching for VLM descriptions.
 """
-from typing import List, Dict, Tuple
+from typing import List, Tuple
 import math
 import re
 from collections import Counter
+
 
 class BM25Matcher:
     """BM25 algorithm for ranking text documents by relevance to a query."""
@@ -29,9 +30,7 @@ class BM25Matcher:
     
     def tokenize(self, text: str) -> List[str]:
         """Tokenize text into lowercase words."""
-        # Remove special characters and convert to lowercase
         text = re.sub(r'[^\w\s]', ' ', text.lower())
-        # Split and filter empty strings
         tokens = [word for word in text.split() if word]
         return tokens
     
@@ -45,24 +44,19 @@ class BM25Matcher:
         self.documents = documents
         self.doc_count = len(documents)
         
-        # Tokenize all documents
         tokenized_docs = [self.tokenize(doc) for doc in documents]
         
-        # Calculate document lengths
         self.doc_lengths = [len(doc) for doc in tokenized_docs]
         self.avg_doc_length = sum(self.doc_lengths) / self.doc_count if self.doc_count > 0 else 0
         
-        # Calculate document frequencies
         self.doc_freqs = {}
         for doc_tokens in tokenized_docs:
             unique_tokens = set(doc_tokens)
             for token in unique_tokens:
                 self.doc_freqs[token] = self.doc_freqs.get(token, 0) + 1
         
-        # Calculate IDF (Inverse Document Frequency)
         self.idf = {}
         for token, freq in self.doc_freqs.items():
-            # IDF formula: log((N - df + 0.5) / (df + 0.5) + 1)
             self.idf[token] = math.log((self.doc_count - freq + 0.5) / (freq + 0.5) + 1)
     
     def score_document(self, query: str, doc_index: int) -> float:
@@ -83,7 +77,6 @@ class BM25Matcher:
         doc_tokens = self.tokenize(self.documents[doc_index])
         doc_length = self.doc_lengths[doc_index]
         
-        # Count term frequencies in document
         term_freqs = Counter(doc_tokens)
         
         score = 0.0
@@ -91,11 +84,8 @@ class BM25Matcher:
             if token not in self.idf:
                 continue
             
-            # Term frequency in document
             tf = term_freqs.get(token, 0)
             
-            # BM25 formula
-            # score += IDF * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (doc_length / avg_doc_length)))
             numerator = tf * (self.k1 + 1)
             denominator = tf + self.k1 * (1 - self.b + self.b * (doc_length / self.avg_doc_length))
             score += self.idf[token] * (numerator / denominator)
@@ -116,17 +106,16 @@ class BM25Matcher:
         scores = []
         for i in range(len(self.documents)):
             score = self.score_document(query, i)
-            if score > 0:  # Only include documents with non-zero scores
+            if score > 0:
                 scores.append((i, score))
         
-        # Sort by score descending
         scores.sort(key=lambda x: x[1], reverse=True)
-        
         return scores[:top_k]
 
 
 # Singleton instance
 _bm25_matcher = None
+
 
 def get_bm25_matcher() -> BM25Matcher:
     """Get or create BM25 matcher singleton."""

@@ -1,189 +1,264 @@
-from typing import Annotated, List, Optional
-from uuid import UUID
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+"""
+Images router — upload, gallery, delete, image detail.
+All routes are scoped to the authenticated user.
+"""
+import uuid
+import time
+from pathlib import Path
+from PIL import Image, ImageOps
+import io
+import numpy as np
 
-from database import get_db
-from models import User, Image
-from auth import get_current_user
-from services.storage import save_image, delete_image_files
-from workers.processor import process_image_task
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+
+import config
+from database import get_db_connection, get_qdrant_client
+from services.embedding_service import get_embedding_service
+from services.redis_cache import get_redis_cache
+from services.auth_service import get_current_user
+from models import UploadResponse, GalleryResponse, GalleryImage
 
 router = APIRouter()
 
 
-class ImageResponse(BaseModel):
-    id: UUID
-    filename: str
-    original_filename: str
-    file_path: str
-    thumbnail_path: Optional[str]
-    processing_status: str
-    vlm_description: Optional[str] = None
-    created_at: datetime
-    processed_at: Optional[datetime]
-
-    class Config:
-        from_attributes = True
-
-
-class ImageListResponse(BaseModel):
-    images: List[ImageResponse]
-    total: int
-
-
-@router.post("/upload", response_model=List[ImageResponse], status_code=status.HTTP_201_CREATED)
-async def upload_images(
-    background_tasks: BackgroundTasks,
-    files: List[UploadFile] = File(...),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+@router.post("/upload", response_model=UploadResponse)
+async def upload_image(
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user),
 ):
-    """Upload one or more images. Processing happens in background."""
-    uploaded_images = []
-    
-    for file in files:
-        # Validate file type
-        if not file.content_type or not file.content_type.startswith("image/"):
-            continue
-        
-        # Save file and create DB record
-        image = await save_image(file, current_user.id, db)
-        uploaded_images.append(image)
-        
-        # Queue background processing
-        background_tasks.add_task(process_image_task, str(image.id))
-    
-    if not uploaded_images:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No valid images uploaded"
-        )
-    
-    return uploaded_images
-
-
-@router.get("/", response_model=ImageListResponse)
-async def list_images(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 50
-):
-    """List all images owned by the current user."""
-    # Get total count
-    count_result = await db.execute(
-        select(Image).where(Image.owner_id == current_user.id)
-    )
-    total = len(count_result.scalars().all())
-    
-    # Get paginated results
-    result = await db.execute(
-        select(Image)
-        .where(Image.owner_id == current_user.id)
-        .order_by(Image.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-    )
-    images = result.scalars().all()
-    
-    return ImageListResponse(images=images, total=total)
-
-
-@router.get("/{image_id}", response_model=ImageResponse)
-async def get_image(
-    image_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Get a specific image by ID."""
-    result = await db.execute(
-        select(Image).where(Image.id == image_id, Image.owner_id == current_user.id)
-    )
-    image = result.scalar_one_or_none()
-    
-    if not image:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Image not found"
-        )
-    
-    return image
-
-
-@router.delete("/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_image(
-    image_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Delete an image and all related data (faces, embeddings)."""
-    from models import Face
-    from services.qdrant import delete_image_embedding, delete_face_embedding
-    
-    result = await db.execute(
-        select(Image).where(Image.id == image_id, Image.owner_id == current_user.id)
-    )
-    image = result.scalar_one_or_none()
-    
-    if not image:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Image not found"
-        )
-    
-    # Delete related faces first (to satisfy foreign key constraint)
-    faces_result = await db.execute(
-        select(Face).where(Face.image_id == image_id)
-    )
-    faces = faces_result.scalars().all()
-    
-    for face in faces:
-        # Delete face embedding from Qdrant
-        try:
-            await delete_face_embedding(str(current_user.id), str(face.id))
-        except Exception:
-            pass  # Ignore Qdrant errors
-        await db.delete(face)
-    
-    # Delete image embedding from Qdrant
+    """Upload an image and index it with CLIP, scoped to the current user."""
+    upload_start = time.time()
     try:
-        await delete_image_embedding(str(current_user.id), str(image_id))
-    except Exception:
-        pass  # Ignore Qdrant errors
-    
-    # Delete files from storage
-    await delete_image_files(image)
-    
-    # Delete image from database
-    await db.delete(image)
-    await db.commit()
+        image_id = str(uuid.uuid4())
 
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents))
+        image = ImageOps.exif_transpose(image)
+        if image.mode != "RGB":
+            image = image.convert("RGB")
 
-@router.get("/{image_id}/status")
-async def get_processing_status(
-    image_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Get processing status for an image."""
-    result = await db.execute(
-        select(Image).where(Image.id == image_id, Image.owner_id == current_user.id)
-    )
-    image = result.scalar_one_or_none()
-    
-    if not image:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Image not found"
+        # Store files in per-user subdirectory
+        user_storage = config.STORAGE_DIR / user_id
+        user_storage.mkdir(parents=True, exist_ok=True)
+        file_path = user_storage / f"{image_id}.jpg"
+        image.save(file_path, "JPEG", quality=95)
+
+        # Compute CLIP embedding
+        clip_start = time.time()
+        embedding_service = get_embedding_service()
+        image_embedding = embedding_service.encode_image(image)
+        clip_time = time.time() - clip_start
+
+        # Store metadata in PostgreSQL
+        db_start = time.time()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO images (id, user_id, file_path) VALUES (%s, %s, %s)",
+            (image_id, user_id, str(file_path)),
         )
-    
-    return {
-        "id": image.id,
-        "status": image.processing_status,
-        "error": image.processing_error,
-        "processed_at": image.processed_at
-    }
+        conn.commit()
+        db_time = time.time() - db_start
+
+        # Detect faces
+        faces = []
+        face_start = time.time()
+        try:
+            from services.face_service import get_face_service
+            face_service = get_face_service()
+            faces = face_service.detect_and_extract_faces(image)
+
+            for face in faces:
+                face_id = str(uuid.uuid4())
+                bbox = face["bbox"]
+                face_service.save_face_thumbnail(face["face_crop"], face_id)
+                cursor.execute(
+                    """INSERT INTO faces
+                       (id, image_id, face_embedding, bbox_x, bbox_y, bbox_width, bbox_height, confidence)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (face_id, image_id, face["embedding"].tolist(),
+                     bbox[0], bbox[1], bbox[2], bbox[3], face["confidence"]),
+                )
+            conn.commit()
+        except Exception as e:
+            print(f">> Face detection error (upload will continue): {str(e)}")
+
+        # VLM description
+        vlm_description = None
+        if config.ENABLE_VLM:
+            try:
+                from services.vlm_service import get_vlm_service
+                vlm_service = get_vlm_service()
+                if vlm_service.is_available():
+                    print(f">> Generating VLM description for {image_id}...")
+                    vlm_description = vlm_service.generate_caption(image)
+                    if vlm_description:
+                        cursor.execute(
+                            "UPDATE images SET vlm_description = %s, vlm_processed = TRUE WHERE id = %s",
+                            (vlm_description, image_id),
+                        )
+                        conn.commit()
+                        print(f">> VLM description: {vlm_description[:100]}...")
+            except Exception as e:
+                print(f">> VLM description failed (upload will continue): {str(e)}")
+
+        cursor.close()
+        conn.close()
+
+        # Upsert into Qdrant — include user_id in payload for filtering
+        qdrant_client = get_qdrant_client()
+        qdrant_client.upsert(
+            collection_name=config.QDRANT_COLLECTION,
+            points=[{
+                "id": image_id,
+                "vector": image_embedding.tolist(),
+                "payload": {"image_id": image_id, "user_id": user_id},
+            }],
+        )
+
+        # Cache embedding
+        redis_cache = get_redis_cache()
+        redis_cache.set_embedding(image_id, image_embedding)
+
+        total_time = time.time() - upload_start
+        face_time = time.time() - face_start
+        print(f">> Upload timing - CLIP: {clip_time:.2f}s, Face: {face_time:.2f}s, DB: {db_time:.2f}s, Total: {total_time:.2f}s")
+
+        message = f"Image uploaded and indexed. Detected {len(faces)} face(s)."
+        if vlm_description:
+            message += " Deep Search enabled."
+
+        return UploadResponse(
+            image_id=image_id,
+            file_path=str(file_path),
+            message=message,
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+@router.get("/gallery", response_model=GalleryResponse)
+async def get_gallery(user_id: str = Depends(get_current_user)):
+    """Get all images for the current user."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT id, file_path, vlm_description, created_at
+            FROM images
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+        """, (user_id,))
+        rows = cursor.fetchall()
+
+        images = []
+        for row in rows:
+            image_id = row["id"]
+            cursor.execute("""
+                SELECT DISTINCT fc.name, fc.id
+                FROM faces f
+                JOIN face_clusters fc ON f.cluster_id = fc.id
+                WHERE f.image_id = %s
+                ORDER BY fc.name
+            """, (image_id,))
+            face_rows = cursor.fetchall()
+            face_names = [
+                fr["name"] if fr["name"] else f"Person {fr['id'][:8]}"
+                for fr in face_rows
+            ]
+
+            images.append(GalleryImage(
+                id=row["id"],
+                url=f"/images/{user_id}/{row['id']}.jpg",
+                uploaded_at=row["created_at"].isoformat() if row["created_at"] else None,
+                description=row["vlm_description"],
+                faces=face_names,
+            ))
+
+        cursor.close()
+        conn.close()
+        return GalleryResponse(total=len(images), images=images)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch gallery: {str(e)}")
+
+
+@router.delete("/images")
+async def delete_images(
+    image_ids: list[str],
+    user_id: str = Depends(get_current_user),
+):
+    """Delete the current user's images by ID."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        qdrant_client = get_qdrant_client()
+        redis_cache = get_redis_cache()
+
+        deleted_count = 0
+        for image_id in image_ids:
+            # Only delete if the image belongs to this user
+            cursor.execute(
+                "SELECT file_path FROM images WHERE id = %s AND user_id = %s",
+                (image_id, user_id),
+            )
+            row = cursor.fetchone()
+            if row:
+                file_path = Path(row["file_path"])
+                if file_path.exists():
+                    file_path.unlink()
+
+                cursor.execute("DELETE FROM images WHERE id = %s", (image_id,))
+                qdrant_client.delete(
+                    collection_name=config.QDRANT_COLLECTION,
+                    points_selector=[image_id],
+                )
+                redis_cache.delete_embedding(image_id)
+                deleted_count += 1
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return {"message": f"Successfully deleted {deleted_count} image(s)", "deleted_count": deleted_count}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
+
+
+@router.get("/image-details/{image_id}")
+async def get_image_details(
+    image_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Get detailed metadata for one of the current user's images."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT id, file_path, vlm_description, vlm_processed, created_at
+            FROM images
+            WHERE id = %s AND user_id = %s
+        """, (image_id, user_id))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not row:
+            raise HTTPException(status_code=404, detail="Image not found")
+
+        return {
+            "id": row["id"],
+            "image_url": f"/images/{user_id}/{row['id']}.jpg",
+            "vlm_description": row["vlm_description"],
+            "vlm_processed": row["vlm_processed"],
+            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get image details: {str(e)}")

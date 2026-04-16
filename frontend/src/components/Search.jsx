@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import client from '../api/client';
 import './Search.css';
 import './SearchModal.css';
 
@@ -28,14 +28,12 @@ function Search() {
 
         try {
             // Determine endpoint based on search mode
-            const endpoint = searchMode === 'deep'
-                ? 'http://localhost:8000/deep-search'
-                : 'http://localhost:8000/search';
+            const endpoint = searchMode === 'deep' ? '/deep-search' : '/search';
 
             // For normal search, check spelling first
             let finalQuery = searchQuery;
             if (searchMode === 'normal') {
-                const spellResponse = await axios.post('http://localhost:8000/spell-check', {
+                const spellResponse = await client.post('/spell-check', {
                     query: searchQuery
                 });
 
@@ -51,7 +49,7 @@ function Search() {
             }
 
             // Perform search with final query
-            const searchResponse = await axios.post(endpoint, {
+            const searchResponse = await client.post(endpoint, {
                 query: finalQuery,
                 top_k: 20
             });
@@ -60,8 +58,8 @@ function Search() {
 
             // Get suggestions if no results (only for normal search)
             if (searchResponse.data.results.length === 0 && searchMode === 'normal') {
-                const suggestionsResponse = await axios.get(
-                    `http://localhost:8000/search-suggestions?query=${finalQuery}`
+                const suggestionsResponse = await client.get(
+                    `/search-suggestions?query=${finalQuery}`
                 );
                 setSuggestions(suggestionsResponse.data.suggestions);
             } else {
@@ -101,7 +99,7 @@ function Search() {
         setModalLoading(true);
 
         try {
-            const response = await axios.get(`http://localhost:8000/image-details/${imageId}`);
+            const response = await client.get(`/image-details/${imageId}`);
             setImageDetails(response.data);
         } catch (error) {
             console.error('Failed to load image details:', error);

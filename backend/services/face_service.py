@@ -41,14 +41,11 @@ class FaceService:
         
         # Preload models to avoid lazy loading on first use
         try:
-            # Explicitly build the recognition model
             DeepFace.build_model(self.model_name)
             
-            # Create a test image to trigger detector initialization
             test_img = np.ones((200, 200, 3), dtype=np.uint8) * 128
-            test_img[50:150, 75:125] = 180  # Lighter "face" region
+            test_img[50:150, 75:125] = 180
             
-            # Run face detection to trigger full initialization
             _ = DeepFace.represent(
                 img_path=test_img,
                 model_name=self.model_name,
@@ -78,44 +75,31 @@ class FaceService:
         """
         start_time = time.time()
         try:
-            # Convert PIL to numpy array (RGB)
             img_array = np.array(image)
-            
-            # DeepFace expects BGR for cv2
             img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
             
-            # Detect faces and extract embeddings
             face_objs = DeepFace.represent(
                 img_path=img_bgr,
                 model_name=self.model_name,
                 detector_backend=self.detector_backend,
-                enforce_detection=False,  # Don't fail if no faces found
+                enforce_detection=False,
                 align=True
             )
             
             faces = []
             for face_obj in face_objs:
-                # Extract bounding box
                 facial_area = face_obj.get("facial_area", {})
                 x = facial_area.get("x", 0)
                 y = facial_area.get("y", 0)
                 w = facial_area.get("w", 0)
                 h = facial_area.get("h", 0)
                 
-                # Skip invalid detections
                 if w == 0 or h == 0:
                     continue
                 
-                # Extract face crop
                 face_crop = image.crop((x, y, x + w, y + h))
-                
-                # Get embedding (512-dim for ArcFace)
                 embedding = np.array(face_obj["embedding"])
-                
-                # Normalize embedding (L2 normalization)
                 embedding = embedding / np.linalg.norm(embedding)
-                
-                # Get confidence
                 confidence = face_obj.get("confidence", 1.0)
                 
                 faces.append({
@@ -137,22 +121,21 @@ class FaceService:
     def save_face_thumbnail(self, face_crop: Image.Image, face_id: str) -> str:
         """
         Save face crop as thumbnail.
-        
+
         Args:
             face_crop: PIL Image of face
             face_id: UUID of face
-            
+
         Returns:
             Path to saved thumbnail
         """
-        # Resize to 100x100 for consistency
+        # Ensure directory exists (safety net if startup mkdir was skipped)
+        self.face_storage.mkdir(parents=True, exist_ok=True)
         thumbnail = face_crop.resize((100, 100), Image.Resampling.LANCZOS)
-        
-        # Save as JPEG
         thumbnail_path = self.face_storage / f"{face_id}.jpg"
         thumbnail.save(thumbnail_path, "JPEG", quality=90)
-        
         return str(thumbnail_path)
+
     
     def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
         """
@@ -165,9 +148,7 @@ class FaceService:
         Returns:
             Similarity score (0-1, higher is more similar)
         """
-        # Cosine similarity (embeddings are already normalized)
         similarity = np.dot(embedding1, embedding2)
-        
         return float(similarity)
 
 

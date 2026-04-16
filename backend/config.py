@@ -41,25 +41,30 @@ import torch
 DEVICE = os.getenv("DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
 
 # Search Configuration
-TOP_K = 20  # Number of results to return
-SCORE_THRESHOLD = 0.20  # Minimum similarity score for normal search
-DEEP_SEARCH_THRESHOLD = 0.35  # Higher threshold for Deep Search (text-to-text matching)
-ENABLE_LOCAL_RERANKING = True  # Enable local crop re-ranking
-ENABLE_ZERO_SHOT_FILTER = False  # Disable zero-shot filtering (too aggressive)
-ZERO_SHOT_THRESHOLD = 0.55  # Confidence threshold for zero-shot
-GLOBAL_WEIGHT = 0.6  # Weight for global similarity
-LOCAL_WEIGHT = 0.4  # Weight for local similarity
-NUM_CROPS = 5  # Number of crops per image for local scoring
+TOP_K = 20
+SCORE_THRESHOLD = 0.20
+DEEP_SEARCH_THRESHOLD = 0.35
+ENABLE_LOCAL_RERANKING = True
+ENABLE_ZERO_SHOT_FILTER = False
+ZERO_SHOT_THRESHOLD = 0.55
+GLOBAL_WEIGHT = 0.6
+LOCAL_WEIGHT = 0.4
+NUM_CROPS = 5
 
 # API Configuration
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8000"))
 
-# VLM Configuration (SmolVLM2-2.2B for Deep Search)
+# VLM Configuration
 ENABLE_VLM = os.getenv("ENABLE_VLM", "true").lower() == "true"
 
 # Deep Search Hybrid Configuration
-# Combines BM25 keyword matching with CLIP semantic matching
-BM25_WEIGHT = 0.7  # Weight for keyword matching (precision)
-CLIP_WEIGHT = 0.3  # Weight for semantic matching (recall)
-MIN_BM25_SCORE = 0.30  # Minimum normalized BM25 score to filter weak matches
+BM25_WEIGHT = 0.7
+CLIP_WEIGHT = 0.3
+MIN_BM25_SCORE = 0.30
+
+# JWT Authentication
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-me-in-production-use-a-long-random-string")
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+REFRESH_TOKEN_EXPIRE_DAYS = 30

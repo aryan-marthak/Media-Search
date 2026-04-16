@@ -38,7 +38,6 @@ class RedisCache:
         if data is None:
             return None
         
-        # Deserialize numpy array
         embedding = pickle.loads(data)
         return embedding
     

@@ -34,7 +34,6 @@ class SearchHelper:
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # Get all labeled person names
             cursor.execute("""
                 SELECT DISTINCT name 
                 FROM face_clusters 
@@ -44,15 +43,12 @@ class SearchHelper:
             cursor.close()
             conn.close()
             
-            # Add names to spell checker's known words
             for row in rows:
                 name = row['name'].lower()
-                # Add the full name and individual words
                 self.spell.word_frequency.load_words([name])
                 for word in name.split():
                     self.spell.word_frequency.load_words([word])
         except Exception as e:
-            # If database query fails, continue without person names
             print(f"Warning: Could not load person names: {e}")
     
     def correct_spelling(self, query: str) -> tuple[str, bool]:
@@ -70,12 +66,10 @@ class SearchHelper:
         was_corrected = False
         
         for word in words:
-            # Skip correction if word is already in dictionary (including person names)
             if word in self.spell:
                 corrected_words.append(word)
                 continue
             
-            # Get correction
             corrected = self.spell.correction(word)
             
             if corrected and corrected != word:
@@ -101,14 +95,11 @@ class SearchHelper:
         query_lower = query.lower()
         suggestions = []
         
-        # Find similar terms from common terms
         for term in self.common_terms:
             if term not in query_lower and len(suggestions) < max_suggestions:
-                # Simple similarity check
                 if any(word in term for word in query_lower.split()):
                     suggestions.append(term)
         
-        # If no similar terms, return popular terms
         if not suggestions:
             suggestions = self.common_terms[:max_suggestions]
         
@@ -127,9 +118,7 @@ class SearchHelper:
         words = query.lower().split()
         
         for word in words:
-            # Check if word is misspelled
             if word not in self.spell:
-                # Get best candidate
                 candidates = self.spell.candidates(word)
                 if candidates:
                     best_match = list(candidates)[0]

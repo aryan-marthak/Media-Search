@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import client from '../api/client';
 import ImageCard from './ImageCard';
 import Toast from './Toast';
 import './Gallery.css';
@@ -19,7 +19,7 @@ function Gallery() {
     const fetchGallery = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('http://localhost:8000/gallery');
+            const response = await client.get('/gallery');
             setImages(response.data.images);
         } catch (error) {
             console.error('Failed to fetch gallery:', error);
@@ -52,7 +52,7 @@ function Gallery() {
 
             try {
                 showToast(`Processing ${completedFiles + 1}/${totalFiles}...`, 'loading', 0);
-                await axios.post('http://localhost:8000/upload', formData);
+                await client.post('/upload', formData);
                 completedFiles++;
             } catch (error) {
                 console.error('Upload failed:', error);
@@ -103,7 +103,7 @@ function Gallery() {
         showToast(`Deleting ${count} image${count > 1 ? 's' : ''}...`, 'loading', 0);
 
         try {
-            await axios.delete('http://localhost:8000/images', {
+            await client.delete('/images', {
                 data: Array.from(selectedImages)
             });
 

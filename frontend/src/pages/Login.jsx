@@ -1,20 +1,27 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 
 function Login() {
-    const { login, error, clearError } = useAuth()
+    const { login, error, clearError, isAuthenticated, loading: authLoading } = useAuth()
+    const navigate = useNavigate()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
 
+    // Redirect if already logged in
+    useEffect(() => {
+        if (!authLoading && isAuthenticated) navigate('/', { replace: true })
+    }, [isAuthenticated, authLoading, navigate])
+
     const handleSubmit = async (e) => {
         e.preventDefault()
         setLoading(true)
-        await login(email, password)
+        const ok = await login(email, password)
         setLoading(false)
+        if (ok) navigate('/', { replace: true })
     }
 
     return (
@@ -22,7 +29,7 @@ function Login() {
             <div className="auth-container">
                 <div className="auth-card">
                     <div className="auth-logo">
-                        <h1>MediaSearch</h1>
+                        <h1>PIXELSNAP</h1>
                         <p>Sign in to your account</p>
                     </div>
 

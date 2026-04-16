@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import client from '../api/client';
 import './People.css';
 
 function People() {
@@ -19,7 +19,7 @@ function People() {
     const fetchPeople = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('http://localhost:8000/people');
+            const response = await client.get('/people');
             setPeople(response.data.people);
         } catch (error) {
             console.error('Failed to fetch people:', error);
@@ -31,7 +31,7 @@ function People() {
     const handleCluster = async () => {
         try {
             setLoading(true);
-            await axios.post('http://localhost:8000/cluster-faces');
+            await client.post('/cluster-faces');
             await fetchPeople();
         } catch (error) {
             console.error('Clustering failed:', error);
@@ -44,7 +44,7 @@ function People() {
         if (!newName.trim()) return;
 
         try {
-            await axios.post(`http://localhost:8000/people/${personId}/label`, {
+            await client.post(`/people/${personId}/label`, {
                 name: newName
             });
             setLabelingPerson(null);
@@ -58,7 +58,7 @@ function People() {
     const handleViewPerson = async (person) => {
         try {
             setSelectedPerson(person);
-            const response = await axios.get(`http://localhost:8000/people/${person.id}/images`);
+            const response = await client.get(`/people/${person.id}/images`);
             setPersonImages(response.data.images);
         } catch (error) {
             console.error('Failed to fetch person images:', error);
@@ -99,7 +99,7 @@ function People() {
             // Delete each selected person
             await Promise.all(
                 Array.from(selectedPeople).map(personId =>
-                    axios.delete(`http://localhost:8000/people/${personId}`)
+                    client.delete(`/people/${personId}`)
                 )
             );
 

@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { User, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 
 function Signup() {
-    const { signup, error, clearError } = useAuth()
+    const { signup, error, clearError, isAuthenticated, loading: authLoading } = useAuth()
+    const navigate = useNavigate()
     const [username, setUsername] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -12,6 +13,11 @@ function Signup() {
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
     const [localError, setLocalError] = useState('')
+
+    // Redirect if already logged in
+    useEffect(() => {
+        if (!authLoading && isAuthenticated) navigate('/', { replace: true })
+    }, [isAuthenticated, authLoading, navigate])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -28,8 +34,9 @@ function Signup() {
 
         setLocalError('')
         setLoading(true)
-        await signup(username, email, password)
+        const ok = await signup(username, email, password)
         setLoading(false)
+        if (ok) navigate('/', { replace: true })
     }
 
     const displayError = localError || error
@@ -39,7 +46,7 @@ function Signup() {
             <div className="auth-container">
                 <div className="auth-card">
                     <div className="auth-logo">
-                        <h1>MediaSearch</h1>
+                        <h1>PIXELSNAP</h1>
                         <p>Create your account</p>
                     </div>
 

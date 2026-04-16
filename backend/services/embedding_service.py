@@ -41,15 +41,9 @@ class CLIPEmbeddingService:
             Normalized embedding vector (768-dim)
         """
         with torch.no_grad():
-            # Tokenize text
             text_tokens = self.tokenizer([text]).to(self.device)
-            
-            # Get text features
             text_features = self.model.encode_text(text_tokens)
-            
-            # Normalize
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
-            
             return text_features.cpu().numpy()[0]
     
     def encode_image(self, image: Image.Image) -> np.ndarray:
@@ -63,15 +57,9 @@ class CLIPEmbeddingService:
             Normalized embedding vector (768-dim)
         """
         with torch.no_grad():
-            # Preprocess image
             image_input = self.preprocess(image).unsqueeze(0).to(self.device)
-            
-            # Get image features
             image_features = self.model.encode_image(image_input)
-            
-            # Normalize
             image_features = image_features / image_features.norm(dim=-1, keepdim=True)
-            
             return image_features.cpu().numpy()[0]
     
     def compute_similarity(self, text_embedding: np.ndarray, image_embedding: np.ndarray) -> float:
@@ -173,45 +161,35 @@ class CLIPEmbeddingService:
         Returns:
             (contains_concept: bool, confidence: float)
         """
-        # Positive prompts
         positive_prompts = [
             f"a photo of {query}",
             f"{query}",
             f"an image containing {query}"
         ]
-        
-        # Negative prompts
         negative_prompts = [
             "a photo without any specific subject",
             "an empty scene",
             "a landscape or nature scene"
         ]
         
-        # Encode image
         image_embedding = self.encode_image(image)
         
-        # Compute positive scores
         positive_scores = []
         for prompt in positive_prompts:
             text_emb = self.encode_text(prompt)
             score = self.compute_similarity(text_emb, image_embedding)
             positive_scores.append(score)
         
-        # Compute negative scores
         negative_scores = []
         for prompt in negative_prompts:
             text_emb = self.encode_text(prompt)
             score = self.compute_similarity(text_emb, image_embedding)
             negative_scores.append(score)
         
-        # Average scores
         avg_positive = np.mean(positive_scores)
         avg_negative = np.mean(negative_scores)
         
-        # Confidence: normalized difference
         confidence = (avg_positive - avg_negative + 1.0) / 2.0
-        
-        # Decision
         contains_concept = confidence > threshold
         
         return contains_concept, float(confidence)
