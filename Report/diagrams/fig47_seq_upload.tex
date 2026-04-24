@@ -1,0 +1,45 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{pgf-umlsd}
+\usepackage{tikz}
+
+\begin{document}
+\begin{sequencediagram}
+\newthread{u}{User}
+\newinst{fe}{React SPA}
+\newinst{api}{FastAPI}
+\newinst{clip}{CLIP}
+\newinst{vlm}{SmolVLM}
+\newinst{face}{DeepFace}
+\newinst{db}{PG / Qdrant}
+
+\begin{call}{u}{Drag-and-drop images}{fe}{}
+\end{call}
+
+\begin{call}{fe}{POST /images/upload (multipart)}{api}{}
+  \begin{call}{api}{embed(image)}{clip}{embedding}
+  \end{call}
+  \begin{call}{api}{upsert(embedding, user\_id)}{db}{}
+  \end{call}
+  \begin{call}{api}{INSERT metadata}{db}{}
+  \end{call}
+\end{call}
+
+\begin{call}{api}{SSE: \{status: embedding\_done\}}{fe}{}
+\end{call}
+
+\begin{call}{api}{[background] describe(image)}{vlm}{description text}
+\end{call}
+\begin{call}{api}{UPDATE vlm\_description}{db}{}
+\end{call}
+\begin{call}{api}{SSE: \{status: vlm\_done\}}{fe}{}
+\end{call}
+
+\begin{call}{api}{[background] detect\_faces(image)}{face}{face list}
+\end{call}
+\begin{call}{api}{INSERT faces; DBSCAN cluster}{db}{}
+\end{call}
+\begin{call}{api}{SSE: \{status: face\_done\}}{fe}{}
+\end{call}
+
+\end{sequencediagram}
+\end{document}

@@ -94,18 +94,16 @@ function AppContent() {
                 </header>
             )}
 
-            <main className="main-content">
-                <Routes>
-                    {/* Public routes */}
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/signup" element={<Signup />} />
+            <Routes>
+                {/* Public routes — rendered outside main-content to avoid extra padding */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
 
-                    {/* Protected routes */}
-                    <Route path="/" element={<ProtectedRoute><Gallery /></ProtectedRoute>} />
-                    <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
-                    <Route path="/people" element={<ProtectedRoute><People /></ProtectedRoute>} />
-                </Routes>
-            </main>
+                {/* Protected routes — wrapped in main-content for proper layout */}
+                <Route path="/" element={<main className="main-content"><ProtectedRoute><Gallery /></ProtectedRoute></main>} />
+                <Route path="/search" element={<main className="main-content"><ProtectedRoute><Search /></ProtectedRoute></main>} />
+                <Route path="/people" element={<main className="main-content"><ProtectedRoute><People /></ProtectedRoute></main>} />
+            </Routes>
         </div>
     );
 }

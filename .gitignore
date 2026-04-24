@@ -39,3 +39,6 @@ huggingface/
 # OS
 .DS_Store
 Thumbs.db
+
+# Metrics
+Metrics/Images/*

@@ -18,19 +18,13 @@ def get_db_connection():
 
 
 def init_postgres():
-    """Initialize PostgreSQL schema (clean slate — drops and recreates all tables)."""
+    """Initialize PostgreSQL schema using CREATE TABLE IF NOT EXISTS — data is preserved across restarts."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Drop existing tables in reverse dependency order
-    cursor.execute("DROP TABLE IF EXISTS faces CASCADE")
-    cursor.execute("DROP TABLE IF EXISTS face_clusters CASCADE")
-    cursor.execute("DROP TABLE IF EXISTS images CASCADE")
-    cursor.execute("DROP TABLE IF EXISTS users CASCADE")
-
     # Users table
     cursor.execute("""
-        CREATE TABLE users (
+        CREATE TABLE IF NOT EXISTS users (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE NOT NULL,
@@ -41,7 +35,7 @@ def init_postgres():
 
     # Images — scoped to a user
     cursor.execute("""
-        CREATE TABLE images (
+        CREATE TABLE IF NOT EXISTS images (
             id UUID PRIMARY KEY,
             user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             file_path TEXT NOT NULL,
@@ -53,7 +47,7 @@ def init_postgres():
 
     # Face clusters — scoped to a user
     cursor.execute("""
-        CREATE TABLE face_clusters (
+        CREATE TABLE IF NOT EXISTS face_clusters (
             id UUID PRIMARY KEY,
             user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             name TEXT,
@@ -64,9 +58,9 @@ def init_postgres():
         )
     """)
 
-    # Faces — linked to images (cascades user_id via images)
+    # Faces — linked to images
     cursor.execute("""
-        CREATE TABLE faces (
+        CREATE TABLE IF NOT EXISTS faces (
             id UUID PRIMARY KEY,
             image_id UUID NOT NULL REFERENCES images(id) ON DELETE CASCADE,
             cluster_id UUID REFERENCES face_clusters(id) ON DELETE SET NULL,
@@ -83,7 +77,7 @@ def init_postgres():
     conn.commit()
     cursor.close()
     conn.close()
-    print(">> PostgreSQL schema initialized (clean slate with user_id columns)")
+    print(">> PostgreSQL schema ready (tables created if not exists)")
 
 
 # Qdrant client singleton
@@ -101,24 +95,22 @@ def get_qdrant_client():
 def init_qdrant(vector_size=768):
     """
     Initialize Qdrant collection for CLIP embeddings.
-    Recreates the collection on startup to match the clean slate approach.
+    Only creates the collection if it doesn't already exist — data is preserved.
     Vector size: 768 dimensions (ViT-L-14)
     """
     client = get_qdrant_client()
 
-    # Delete and recreate for clean slate
     collections = client.get_collections().collections
     collection_names = [col.name for col in collections]
 
-    if config.QDRANT_COLLECTION in collection_names:
-        client.delete_collection(config.QDRANT_COLLECTION)
-        print(f">> Qdrant collection '{config.QDRANT_COLLECTION}' dropped (clean slate)")
-
-    client.create_collection(
-        collection_name=config.QDRANT_COLLECTION,
-        vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
-    )
-    print(f">> Qdrant collection '{config.QDRANT_COLLECTION}' created (768-dim)")
+    if config.QDRANT_COLLECTION not in collection_names:
+        client.create_collection(
+            collection_name=config.QDRANT_COLLECTION,
+            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+        )
+        print(f">> Qdrant collection '{config.QDRANT_COLLECTION}' created (768-dim)")
+    else:
+        print(f">> Qdrant collection '{config.QDRANT_COLLECTION}' already exists — keeping data")
 
 
 def init_databases():

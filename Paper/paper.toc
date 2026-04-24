@@ -1,0 +1,47 @@
+\contentsline {chapter}{Abstract}{1}{chapter*.1}%
+\contentsline {chapter}{\numberline {1}Introduction}{4}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Background}{4}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Problem Statement}{5}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Research Questions}{5}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Contributions}{6}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Paper Organisation}{6}{section.1.5}%
+\contentsline {chapter}{\numberline {2}Literature Review}{7}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Overview}{7}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Vision-Language Pre-Training and CLIP}{7}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Two-Stage Retrieval and Local Re-Ranking}{8}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Vision-Language Models for Image Captioning}{8}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Hybrid Keyword-Semantic Search}{9}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Face Detection and Clustering}{9}{section.2.6}%
+\contentsline {section}{\numberline {2.7}Vector Databases}{9}{section.2.7}%
+\contentsline {section}{\numberline {2.8}Gaps in Current Work}{10}{section.2.8}%
+\contentsline {chapter}{\numberline {3}System Architecture and Methodology}{11}{chapter.3}%
+\contentsline {section}{\numberline {3.1}System Overview}{11}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Image Processing Pipeline}{11}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Search Pipeline}{12}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Mode 1: Global CLIP Search}{12}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.3.2}Mode 2: CLIP Search with Local Re-Ranking}{12}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.3.3}Mode 3: Deep Hybrid Search (BM25 + CLIP)}{13}{subsection.3.3.3}%
+\contentsline {section}{\numberline {3.4}Score Calibration}{13}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Face Search}{14}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Technology Stack}{14}{section.3.6}%
+\contentsline {chapter}{\numberline {4}Experimental Setup}{16}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Dataset}{16}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Evaluation Metrics}{16}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Baselines and Configurations}{16}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Hardware}{17}{section.4.4}%
+\contentsline {chapter}{\numberline {5}Results and Analysis}{18}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Retrieval Quality}{18}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Addressing the Research Questions}{19}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}RQ1: Does local crop re-ranking improve retrieval precision?}{19}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2}RQ2: Does the hybrid approach outperform single-modality search?}{20}{subsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.2.3}RQ3: Score fusion weights}{20}{subsection.5.2.3}%
+\contentsline {subsection}{\numberline {5.2.4}RQ4: Face clustering usability}{20}{subsection.5.2.4}%
+\contentsline {section}{\numberline {5.3}Latency Analysis}{20}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Comparison with Existing Systems}{22}{section.5.4}%
+\contentsline {section}{\numberline {5.5}Failure Analysis}{22}{section.5.5}%
+\contentsline {chapter}{\numberline {6}Conclusion}{24}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Summary of Contributions}{24}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Limitations}{24}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Future Work}{25}{section.6.3}%
+\contentsline {section}{\numberline {6.4}Concluding Remarks}{25}{section.6.4}%
+\contentsline {chapter}{References}{26}{chapter*.11}%

@@ -475,7 +475,7 @@ Edit `backend/config.py` to customize:
 ### GPU Optimization
 
 - **CLIP (ViT-L-14)**: Uses ~1-1.5GB VRAM
-- **Face Detection**: CPU-based via DeepFace
+- **Face Detection**: GPU-accelerated via DeepFace
 - Global embeddings computed once at upload
 - Local embeddings only for Top-K candidates
 - 5 crops per image (manageable GPU load)

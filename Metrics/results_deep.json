@@ -1,0 +1,9 @@
+{
+  "mode": "Deep Hybrid (BM25+CLIP)",
+  "queries_evaluated": 499,
+  "errors": 0,
+  "precision_at_5": 0.1719,
+  "recall_at_20": 0.9289,
+  "mAP": 0.7169,
+  "query_success_rate_pct": 80.8
+}
