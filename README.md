@@ -371,14 +371,9 @@ calibrated_score = sigmoid(raw_similarity × temperature)
 - [ ] Mobile client (React Native)
 - [ ] Cloud storage integration (S3, GCS)
 
-## 📝 License
 
-MIT
+## Acknowledgements
 
-## 🙏 Acknowledgements
-
-- **Prof. Jagruti K. Naik** — Project mentor
-- **OpenAI CLIP** & **OpenCLIP** — Vision-language embeddings
 - **SmolVLM** by HuggingFace — Image descriptions
 - **Qdrant** — Vector search engine
 - **FastAPI** — Python web framework
