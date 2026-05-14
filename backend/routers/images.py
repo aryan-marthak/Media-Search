@@ -116,9 +116,10 @@ async def upload_image(
             }],
         )
 
-        # Cache embedding
+        # Cache embedding and bust stale search results
         redis_cache = get_redis_cache()
         redis_cache.set_embedding(image_id, image_embedding)
+        redis_cache.invalidate_user_search_cache(user_id)
 
         total_time = time.time() - upload_start
         face_time = time.time() - face_start
@@ -221,6 +222,9 @@ async def delete_images(
         conn.commit()
         cursor.close()
         conn.close()
+
+        # Bust stale search result cache now that the library has changed
+        redis_cache.invalidate_user_search_cache(user_id)
 
         return {"message": f"Successfully deleted {deleted_count} image(s)", "deleted_count": deleted_count}
 

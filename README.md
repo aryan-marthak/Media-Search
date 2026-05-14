@@ -16,6 +16,7 @@ An AI-powered personal image retrieval system using a **two-stage CLIP pipeline*
 - **Spell Checking**: Automatic query correction and "did you mean" suggestions
 - **Query Expansion**: Automatic semantic expansion (e.g., "dog" → "puppy", "canine", "pet")
 - **Score Calibration**: Temperature-based sigmoid scoring for tunable precision/recall
+- **Two-Tier Redis Caching**: Query result cache (1hr TTL, auto-invalidated on upload/delete) + image embedding cache for diversity filtering
 - **Docker Compose**: One-command setup for PostgreSQL, Qdrant, and Redis
 
 ## 🏗️ Architecture
@@ -59,9 +60,9 @@ graph TB
 ### Data Flow
 
 ```
-Upload:  Image → Save → Background Task → CLIP Embed + Face Detect + VLM Describe → PostgreSQL + Qdrant
-Search:  Query → Spell Check → Expansion → CLIP Text Embed → Qdrant ANN → Local Re-rank → Results
-Deep:    Query → BM25 on VLM Descriptions + CLIP Embeddings → Hybrid Score → Results
+Upload:  Image → Save → S3/Disk → Background Task → CLIP Embed + Face Detect + VLM Describe → PostgreSQL + Qdrant + Redis (embed cache) → Invalidate Redis query cache
+Search:  Query → Redis cache check (hit: return instantly) → Spell Check → Expansion → CLIP Text Embed → Qdrant ANN → Local Re-rank → Diversity Filter (Redis embed cache) → Store in Redis → Results
+Deep:    Query → Redis cache check (hit: return instantly) → BM25 on VLM Descriptions + CLIP Embeddings → Hybrid Score → Store in Redis → Results
 Faces:   Upload → RetinaFace Detection → ArcFace Embedding → DBSCAN Clustering → Named People
 ```
 
@@ -188,7 +189,7 @@ All authenticated endpoints require `Authorization: Bearer <token>` header.
 - **SmolVLM** (2.2B) — Image description generation via HuggingFace Transformers
 - **Qdrant** — Vector similarity search (ANN)
 - **PostgreSQL** + **SQLAlchemy** (async) — Metadata and user storage
-- **Redis** — Embedding cache
+- **Redis** — Two-tier cache: query result cache (keyed by `user_id + query`, 1hr TTL, invalidated on upload/delete) + image embedding cache (permanent, keyed by `image_id`) for diversity filtering
 - **PyTorch** — Deep learning runtime (CUDA accelerated)
 - **DeepFace** — Face detection (RetinaFace) + face embeddings (ArcFace)
 - **scikit-learn** — DBSCAN face clustering
@@ -229,7 +230,7 @@ Media-Search/
 │       ├── clustering_service.py  # DBSCAN face clustering
 │       ├── bm25_matcher.py        # BM25 keyword matching
 │       ├── auth_service.py        # JWT + bcrypt auth logic
-│       ├── redis_cache.py         # Redis cache layer
+│       ├── redis_cache.py         # Redis cache: query results (TTL + invalidation) + image embeddings
 │       └── search_helper.py       # Spell checking & query suggestions
 ├── frontend/
 │   ├── src/

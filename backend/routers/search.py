@@ -65,6 +65,15 @@ async def search_images(
     Results are scoped to the current user.
     """
     try:
+        redis_cache = get_redis_cache()
+
+        # --- Query result cache hit: skip entire pipeline ---
+        cached = redis_cache.get_search_results(request.query, user_id)
+        if cached:
+            results = [SearchResult(**r) for r in cached]
+            print(f">> Cache hit for query: '{request.query}'")
+            return SearchResponse(query=request.query, results=results, total=len(results))
+
         conn = get_db_connection()
         cursor = conn.cursor()
 
@@ -102,6 +111,7 @@ async def search_images(
                 )
                 for row in rows
             ]
+            redis_cache.set_search_results(request.query, user_id, [r.model_dump() for r in results])
             return SearchResponse(query=request.query, results=results, total=len(results))
 
         cursor.close()
@@ -174,7 +184,6 @@ async def search_images(
 
             diverse_results = []
             used_embeddings = []
-            redis_cache = get_redis_cache()
 
             for item in reranked_results:
                 image_id = item["image_id"]
@@ -226,6 +235,7 @@ async def search_images(
                 for r in search_results
             ][:request.top_k]
 
+        redis_cache.set_search_results(request.query, user_id, [r.model_dump() for r in results])
         return SearchResponse(query=request.query, results=results, total=len(results))
 
     except Exception as e:
@@ -242,6 +252,15 @@ async def deep_search_images(
     Scoped to the current user's images.
     """
     try:
+        redis_cache = get_redis_cache()
+
+        # --- Query result cache hit: skip entire pipeline ---
+        cached = redis_cache.get_search_results(request.query, user_id)
+        if cached:
+            results = [SearchResult(**r) for r in cached]
+            print(f">> Cache hit for deep query: '{request.query}'")
+            return SearchResponse(query=request.query, results=results, total=len(results))
+
         from services.vlm_service import get_vlm_service
         from services.bm25_matcher import get_bm25_matcher
 
@@ -304,6 +323,7 @@ async def deep_search_images(
             for item in results_with_scores[:request.top_k]
         ]
 
+        redis_cache.set_search_results(request.query, user_id, [r.model_dump() for r in results])
         return SearchResponse(query=request.query, results=results, total=len(results))
 
     except HTTPException:

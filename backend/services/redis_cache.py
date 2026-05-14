@@ -1,10 +1,11 @@
 """
-Redis cache service for storing image embeddings.
-Provides fast access to frequently used embeddings.
+Redis cache service for storing image embeddings and search results.
+Provides fast access to frequently used embeddings and cached query results.
 """
 import redis
 import numpy as np
 import pickle
+import json
 from typing import Optional
 import config
 
@@ -63,8 +64,52 @@ class RedisCache:
         key = f"emb:{image_id}"
         self.client.delete(key)
     
+    def get_search_results(self, query: str, user_id: str) -> Optional[list]:
+        """
+        Get cached search results for a query.
+
+        Args:
+            query: The search query string
+            user_id: The authenticated user's ID
+
+        Returns:
+            List of result dicts or None if not cached
+        """
+        key = f"results:{user_id}:{query.lower().strip()}"
+        data = self.client.get(key)
+        if data is None:
+            return None
+        return json.loads(data)
+
+    def set_search_results(self, query: str, user_id: str, results: list, ttl: int = 3600):
+        """
+        Cache search results for a query.
+
+        Args:
+            query: The search query string
+            user_id: The authenticated user's ID
+            results: List of result dicts to cache
+            ttl: Time to live in seconds (default: 1 hour)
+        """
+        key = f"results:{user_id}:{query.lower().strip()}"
+        self.client.setex(key, ttl, json.dumps(results))
+
+    def invalidate_user_search_cache(self, user_id: str):
+        """
+        Delete all cached search results for a user.
+        Should be called when images are uploaded or deleted.
+
+        Args:
+            user_id: The authenticated user's ID
+        """
+        pattern = f"results:{user_id}:*"
+        keys = self.client.keys(pattern)
+        if keys:
+            self.client.delete(*keys)
+            print(f">> Invalidated {len(keys)} cached search result(s) for user {user_id[:8]}...")
+
     def clear_all(self):
-        """Clear all cached embeddings."""
+        """Clear all cached embeddings and search results."""
         self.client.flushdb()
         print(">> Redis cache cleared")
     
