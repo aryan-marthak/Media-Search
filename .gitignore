@@ -46,3 +46,11 @@ Metrics/Images/*
 Report/*
 Paper/*
 Images/*
+
+# Data (Qdrant storage, thumbnails, etc.)
+data/
+
+# Personal / large files
+*.pdf
+*.tex
+resume*
